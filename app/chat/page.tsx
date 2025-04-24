@@ -8,7 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Send, Bot, User, Zap, BookOpen, FileQuestion } from "lucide-react"
+import { Send, Bot, User, Zap, BookOpen, FileQuestion, Upload } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
@@ -18,6 +18,11 @@ interface Message {
   content: string
   role: "user" | "assistant"
   timestamp: Date
+}
+
+interface PDFContext {
+  content: string;
+  fileName: string;
 }
 
 export default function ChatPage() {
@@ -34,6 +39,8 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const [activeTab, setActiveTab] = useState("chat")
+  const [pdfContext, setPdfContext] = useState<PDFContext | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     // Scroll to bottom when messages change
@@ -41,6 +48,42 @@ export default function ChatPage() {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight
     }
   }, [messages])
+
+  const handlePDFUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      const formData = new FormData()
+      formData.append("pdf", file)
+
+      const response = await fetch("/api/pdf", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to process PDF")
+      }
+
+      const data = await response.json()
+      setPdfContext({
+        content: data.content,
+        fileName: file.name,
+      })
+
+      // Add a system message about the PDF context
+      const systemMessage: Message = {
+        id: Date.now().toString(),
+        content: `PDF context loaded: ${file.name}. You can now ask questions about this document.`,
+        role: "assistant",
+        timestamp: new Date(),
+      }
+      setMessages(prev => [...prev, systemMessage])
+    } catch (error) {
+      console.error("Error uploading PDF:", error)
+    }
+  }
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,6 +113,7 @@ export default function ChatPage() {
             role: msg.role,
             content: msg.content,
           })),
+          pdfContext: pdfContext?.content, // Include PDF context if available
         }),
       })
 
@@ -179,6 +223,22 @@ export default function ChatPage() {
                   </CardContent>
                   <CardFooter className="border-t p-4">
                     <form onSubmit={handleSendMessage} className="flex w-full gap-2">
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        className="hidden"
+                        ref={fileInputRef}
+                        onChange={handlePDFUpload}
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="bg-black"
+                      >
+                        <Upload className="h-4 w-4" />
+                      </Button>
                       <Input
                         placeholder="Ask about electronics engineering concepts..."
                         value={input}

@@ -1,13 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const { messages } = await req.json()
+    const { messages, pdfContext } = await req.json()
 
     // Prepare the system message for electronics engineering context
     const systemMessage = {
       role: "system",
       content: `You are an AI assistant specialized in Electronics Engineering for BE students. 
+      ${pdfContext ? `\n\nContext from uploaded PDF:\n${pdfContext}` : ""}
       Provide accurate, educational responses about circuit theory, digital electronics, analog electronics, 
       microprocessors, power electronics, communication systems, and other electronics topics. 
       When appropriate, suggest relevant study resources or quiz topics that would help the student 
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
         model: "llama3-70b-8192",
         messages: [systemMessage, ...messages],
         temperature: 0.7,
-        max_tokens: 1024,
+        max_tokens: 1000,
       }),
     })
 
